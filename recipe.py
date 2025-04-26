@@ -200,8 +200,6 @@ class Recipes:
         nothing
         """
 
-
-    # Open the file and write JSON data
         if not os.path.exists(fileName):
             #checks to see if the cache file has been created if not creates new file and dumps all data into it
             with open(fileName, 'w') as f:
@@ -214,7 +212,6 @@ class Recipes:
                 #checks to see if the cache file is empty
             except:
                 existing_data= []
-        #with open(fileName, 'w') as f:
         existing_data_size= len(existing_data)
         recipe_data_formatted= self.fetchRecipe()
         for recipe in recipe_data_formatted['recipes']:
@@ -332,7 +329,7 @@ class Recipes:
     def get_ingredient_info(self,ingredient_name):
         """
         Given an ingredient name, fetches data from Spoonacular about the ingredinet. 
-        Uses ingredinet dictionary to find ingredinets with the entered string in it and prints the options in an ordered list. 
+        Uses ingredient dictionary to find ingredinets with the entered string in it and prints the options in an ordered list. 
         Prints the price and grocery ailse the ingredient is found in. 
         
         Note:
