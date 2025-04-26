@@ -11,17 +11,23 @@ class Recipes:
     Attributes
     ----------
     recipes : list of recipies
-    ingredient: each ingrient
+    ingredient: each ingredient
+    myRecipes_graph: co-occurrence network of ingredients graph
     """
 
     def __init__(self,cacheFile = None):
         """
         Initializes the Recipe class without any recipes.
         assign recipes attribute to an empty list
+        
         Parameters
-        ------
+        ----------
          cacheFile: str, optional
             name of cache file to load data from, if None initialized without data
+    
+         Return
+         ----------
+            nothing
         """
         if cacheFile is not None:
             successful_load = self.loadCache(cacheFile)
@@ -36,12 +42,17 @@ class Recipes:
     def fetchRecipe(self):
 
         """
-        Fetches the recipes and adds them to cache file. 
+        Fetches information about 100 recipes from Spoonacular API. 
+        Prints error messages for if the number of API calls have reached for the day, 
+        and the response code for all other errors  
 
         Note
-        ----
+        ----------
         The method fetches data from "https://api.spoonacular.com/recipes/random"
-  
+        
+        Return
+        ----------
+            The 100 recipies data in json format. 
         """
 
             # Retry the request until a valid response (status code 200)
@@ -61,13 +72,13 @@ class Recipes:
 
     def loadCache(self, fileName):
         """
-        Loads district data from a cache JSON file if it exists.
+        Loads recipe data from a cache JSON file if it exists. 
+        If it fails to load data in cache File it gives error message. 
 
         Parameters
         ----------
         fileName : str
-            The name of the file from which to load the district data.
-            You should name the cache file as redlines_cache.json
+            The name of the file from which to load the recipe data.
 
         Returns
         -------
@@ -117,6 +128,15 @@ class Recipes:
         """
         Cleans the ingredient name by removing measurements, numbers, and extra terms
         like "tsp", "tbsp", "oz", etc.
+
+        Parameters
+        ----------
+        self
+        str: ingredient name
+
+        Returns
+        ----------
+        str: cleaned ingredient name
         """
         cleaned_name = re.sub(r'\d+|tsp|tbsp|oz|g|kg|lbs|cm|inch|cup|tablespoon|teaspoon|pound|grams|milliliter|liter|serving|to|and|from|by|\\+|\\-|\(|\)', '', ingredient)
         cleaned_name = cleaned_name.strip()
@@ -126,12 +146,22 @@ class Recipes:
     def get_substitutes(self, ingredient_name):
 
         """
-        Fetches the recipes and adds them to cache file.
+        Fetches substitues of ingredient from the Spoonacular API. 
+        Prints out the substutes for the ingredients. 
+        If there are no substitues it prints could not find any substitutes. 
+
+        Parameters
+        ----------
+        self
+        str: ingredient name
 
         Note
         ----
-        The method fetches data from "https://api.spoonacular.com/food/ingredients/{id}/substitutes"
+        The method fetches data from ""https://api.spoonacular.com/food/ingredients/substitutes
 
+        Returns
+        ----------
+        nothing
         """
 
             # Retry the request until a valid response (status code 200)
@@ -157,13 +187,17 @@ class Recipes:
 
     def cacheData(self, fileName):
         """
-        creates a new cache file or updates current cache file with more recipes.
-        Checks for duplicate recipes and caps cache file at 500 recipes.
+        Creates a new cache file or updates current cache file with more recipes.
+        Checks for duplicate recipes and caps cache file at 1099 recipes.
 
         Parameters
         ----------
         filename : str
-            The name of the file where the district data will be saved.
+            The name of the file where the recipe data will be saved.
+        
+        Returns
+        ----------
+        nothing
         """
 
 
@@ -200,6 +234,21 @@ class Recipes:
 
 
     def build_ingredient_network(self):
+        """
+        Builds a co-occurrence network of ingredients from the recipe dataset.
+        Each ingredient is represented as a node, 
+        and an edge is created between any two ingredients that appear in the same recipe. 
+        The weight of the edge represents how often the two ingredients co-occur across all recipes.       
+
+        Parameters
+        ----------
+         self
+
+        Returns
+        ----------
+        nothing
+        """
+
         self.myRecipes_graph = nx.Graph()
 
         for recipe in self.recipes:
@@ -218,30 +267,13 @@ class Recipes:
                             self.myRecipes_graph[ingredient_id][other_ingredient_id]['weight'] += 1
 
 
-    def load_ingredient_csv(self, csv_file):
-        """
-        Loads a simplified ingredients CSV with format: 'name;id'.
-        Populates:
-            - self.name_lookup: name.lower() → id
-            - self.id_lookup: id (int) → name
-        """
-        self.name_lookup = {}  # name → id
-        self.id_lookup = {}    # id → name
-
-        with open(csv_file, 'r', encoding='utf-8') as f:
-            for line in f:
-                if ';' in line:
-                    name, id_str = line.strip().split(';')
-                    name = name.strip().lower()
-                    ing_id = int(id_str.strip())
-                    self.name_lookup[name] = ing_id
-                    self.id_lookup[ing_id] = name
-
 
     def get_ingredient_recommendations(self, ingredient_name, top_n=5):
         """
-        Given an ingredient name, recommend other ingredients that co-occur frequently with it.
-
+        Given an ingredient name, recommends other ingredients that co-occur frequently with it in the ingredient network.
+        Uses ingredinet dictionary to find ingredients with the entered string in it and prints the options in an ordered list. 
+        User choices ingredient and then is given ingredient pairing reccomendation. 
+        
         Parameters:
         -----------
         ingredient_name : str
@@ -298,6 +330,25 @@ class Recipes:
 
 
     def get_ingredient_info(self,ingredient_name):
+        """
+        Given an ingredient name, fetches data from Spoonacular about the ingredinet. 
+        Uses ingredinet dictionary to find ingredinets with the entered string in it and prints the options in an ordered list. 
+        Prints the price and grocery ailse the ingredient is found in. 
+        
+        Note:
+        -----------
+        Uses endpoint: https://api.spoonacular.com/food/ingredients/{ingredient_id}/information
+
+        Parameters:
+        -----------
+        ingredient_name : str
+            The name (or partial name) of the ingredient for which recommendations are made.
+
+        Returns:
+        --------
+            nothing
+        """
+
         matches = [(id, name) for id, name in self.ingredient_list.items() if ingredient_name.lower() in name.lower()]
 
         if not matches:
@@ -369,11 +420,16 @@ class Recipes:
 
 
 def main():
+    """
+    Welcome user to Cooking helper, and asks user what they need help with.
+    Runs coresponding function, and asks if the user wants more help after printing the answer. 
+    If they need more help runs game again, if not exits game. 
+    """
     myRecipes = Recipes(cacheFile='recipeCache1.json')
     myRecipes.build_ingredient_network()
     myRecipes.build_ingredient_list()
 
-    question_options= ['Ingredient Recommendations ',
+    question_options= ['Reccomendations for Ingredient pairings ',
                        'Ingredient Substitues',
                        'Find out what the most connected ingredient is!!',
                        'Ingredient Price and Ailse Informtion']
@@ -393,11 +449,11 @@ def main():
                 print("Please enter a valid number.")
         
         if choice == 1:
-            ingredient_name = input("Which ingredient would you like to get recommendations for? ").strip().lower()
+            ingredient_name = input("What is the name of the ingredient you want to get pairing recommendations for? ").strip().lower()
             myRecipes.get_ingredient_recommendations(ingredient_name)
 
         elif choice == 2:
-            ingredient_name = input("Which ingredient would you like substitutes for? ").strip().lower()
+            ingredient_name = input("What is the name of the ingredient you want substitutions for? ").strip().lower()
             myRecipes.get_substitutes(ingredient_name)
 
         elif choice == 3:
