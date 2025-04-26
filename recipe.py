@@ -165,9 +165,33 @@ class Recipes:
         """
 
             # Retry the request until a valid response (status code 200)
+        matches = [(id, name) for id, name in self.ingredient_list.items() if ingredient_name.lower() in name.lower()]
+
+        if not matches:
+            print(f"No ingredient found matching '{ingredient_name}'.")
+            return []
+
+        if len(matches) > 1:
+            print(f"Multiple matches found for '{ingredient_name}':")
+            for i, (id, name) in enumerate(matches):
+                print(f"{i+1}. {name} (ID: {id})")
+        else:
+            ingredient_id, matched_name = matches[0]
+
+        while True:
+            try:
+                choice = int(input("Enter the number of the ingredient you meant: "))
+                if 1 <= choice <= len(matches):
+                    ingredient_id, matched_name = matches[choice - 1]
+                    break
+                else:
+                    print("Invalid choice. Please enter a number from the list.")
+            except ValueError:
+                print("Please enter a valid number.")
+    
         apiKey= "84054af1abdd4b06a0146895a8f436c0"
         url= "https://api.spoonacular.com/food/ingredients/substitutes"
-        params = { 'apiKey': apiKey, 'ingredientName': ingredient_name}
+        params = { 'apiKey': apiKey, 'ingredientName': matched_name}
         response = requests.get(url, params=params)
 
         if response.status_code == 200:
@@ -176,7 +200,7 @@ class Recipes:
                 print("This ingredient does not have any substitutes.")
             else:
                 substitues= ingredient_sub_formatted['substitutes']
-                print(f"The substitues for '{ingredient_name}' are: ")
+                print(f"The substitues for '{matched_name}' are: ")
                 for sub in substitues:
                     print(sub)
         elif response.status_code ==402:
@@ -200,6 +224,8 @@ class Recipes:
         nothing
         """
 
+
+    # Open the file and write JSON data
         if not os.path.exists(fileName):
             #checks to see if the cache file has been created if not creates new file and dumps all data into it
             with open(fileName, 'w') as f:
@@ -212,6 +238,7 @@ class Recipes:
                 #checks to see if the cache file is empty
             except:
                 existing_data= []
+        #with open(fileName, 'w') as f:
         existing_data_size= len(existing_data)
         recipe_data_formatted= self.fetchRecipe()
         for recipe in recipe_data_formatted['recipes']:
@@ -329,7 +356,7 @@ class Recipes:
     def get_ingredient_info(self,ingredient_name):
         """
         Given an ingredient name, fetches data from Spoonacular about the ingredinet. 
-        Uses ingredient dictionary to find ingredinets with the entered string in it and prints the options in an ordered list. 
+        Uses ingredinet dictionary to find ingredinets with the entered string in it and prints the options in an ordered list. 
         Prints the price and grocery ailse the ingredient is found in. 
         
         Note:
@@ -363,7 +390,7 @@ class Recipes:
             try:
                 choice = int(input("Enter the number of the ingredient you meant: "))
                 if 1 <= choice <= len(matches):
-                    ingredient_id = matches[choice - 1]
+                    ingredient_id, matched_name = matches[choice - 1]
                     break
                 else:
                     print("Invalid choice. Please enter a number from the list.")
@@ -371,10 +398,15 @@ class Recipes:
                 print("Please enter a valid number.")
 
 
+        
         apiKey= "84054af1abdd4b06a0146895a8f436c0"
         url= f"https://api.spoonacular.com/food/ingredients/{ingredient_id}/information"
         params = { 'apiKey': apiKey}
         response = requests.get(url, params=params)
+        if response.status_code != 200:
+            print(f"Failed to fetch ingredient info. Status code: {response.status_code}")
+            print(f"Response: {response.text}")
+            return
         ingredient_info_formatted = response.json()
         #print(ingredient_info_formatted)
 
@@ -426,7 +458,7 @@ def main():
     myRecipes.build_ingredient_network()
     myRecipes.build_ingredient_list()
 
-    question_options= ['Reccomendations for Ingredient pairings ',
+    question_options= ['Ingredient pairing suggestions ',
                        'Ingredient Substitues',
                        'Find out what the most connected ingredient is!!',
                        'Ingredient Price and Ailse Informtion']
@@ -460,7 +492,7 @@ def main():
             ingredient_name = input("Enter the name of the ingredient to get price and aisle info: ").strip().lower()
             myRecipes.get_ingredient_info(ingredient_name)
 
-        more_help_answ= input("Do you need more help (yes/no? ").strip().lower()
+        more_help_answ= input("Do you need more help (yes/no?) ").strip().lower()
         if more_help_answ not in ['yes', 'y', 'sure', 'yeah', 'yup']:
             print("\nOkay, happy cooking!")
             break
