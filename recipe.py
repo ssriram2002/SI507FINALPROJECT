@@ -99,122 +99,7 @@ class Recipes:
         except (IOError, json.JSONDecodeError, TypeError) as e:
             print(f"Error loading cache: {e}")
             return False
-
-    def strip_parentheses(self, text):
-        return re.sub(r'\s*\(.*?\)', '', text).strip()
-
-    def build_ingredient_list(self):
-        """
-        Builds a dictionary of unique ingredient names (full original names),
-        avoiding duplicates based on cleaned names AND IDs.
-        """
-        seen_cleaned = set()
-        cleaned_ingredients = {}
-
-        for recipe in self.recipes:
-            for ingredient in recipe['extendedIngredients']:
-                ingredient_id = ingredient['id']
-                original_name = ingredient['originalName']
-                cleaned_name_key = self.clean_ingredient_name(original_name)  # for deduplication
-                display_name = self.strip_parentheses(original_name)  # for user display
-
-                unique_key = (cleaned_name_key, display_name.lower())
-                if unique_key not in seen_cleaned:
-                    seen_cleaned.add(unique_key)
-                    cleaned_ingredients[ingredient_id] = display_name
-
-        self.ingredient_list = dict(sorted(cleaned_ingredients.items(), key=lambda item: item[1].lower()))
-        print(f"Built ingredient list with {len(self.ingredient_list)} unique items.")
-
-    def clean_ingredient_name(self, ingredient):
-        """
-        Cleans the ingredient name by removing measurements, numbers, units,
-        and parenthetical text (e.g., "butter (melted)" → "butter").
-        """
-        ingredient = re.sub(r'\s*\(.*?\)', '', ingredient)
-        ingredient = re.sub(r'\b\d+\s*(oz|ozs|g|kg|lbs|cm|inch|cup|cups|tablespoon|teaspoon|pound|grams|ml|milliliter|liter|liters|serving|servings|tsp|tbsp)\b', '', ingredient)
-        ingredient = re.sub(r'\b(to|and|from|by|or|with)\b', '', ingredient, flags=re.IGNORECASE)
-        cleaned_name = re.sub(r'\s+', ' ', ingredient).strip().lower()
         
-        return cleaned_name
-
-    def match_ingredient(self, ingredient_name):
-        ingredient_name = ingredient_name.lower().strip()
-
-        matches = [
-            (id, name) for id, name in self.ingredient_list.items()
-            if self.clean_ingredient_name(name).startswith(ingredient_name)
-            or self.clean_ingredient_name(name) == ingredient_name
-        ]
-
-        return matches
-
-    def get_substitutes(self, ingredient_name):
-
-        """
-        Fetches substitues of ingredient from the Spoonacular API. 
-        Prints out the substutes for the ingredients. 
-        If there are no substitues it prints could not find any substitutes. 
-
-        Parameters
-        ----------
-        self
-        str: ingredient name
-
-        Note
-        ----
-        The method fetches data from ""https://api.spoonacular.com/food/ingredients/substitutes
-
-        Returns
-        ----------
-        nothing
-        """
-
-            # Retry the request until a valid response (status code 200)
-        matches = [(id, name) for id, name in self.ingredient_list.items() if ingredient_name.lower() in name.lower()]
-
-        if not matches:
-            print(f"No ingredient found matching '{ingredient_name}'.")
-            return []
-
-        if len(matches) > 1:
-            print(f"Multiple matches found for '{ingredient_name}':")
-            for i, (id, name) in enumerate(matches):
-                print(f"{i+1}. {name} (ID: {id})")
-        else:
-            ingredient_id, matched_name = matches[0]
-
-        while True:
-            try:
-                choice = int(input("Enter the number of the ingredient you meant: "))
-                if 1 <= choice <= len(matches):
-                    ingredient_id, matched_name = matches[choice - 1]
-                    break
-                else:
-                    print("Invalid choice. Please enter a number from the list.")
-            except ValueError:
-                print("Please enter a valid number.")
-    
-        apiKey= "84054af1abdd4b06a0146895a8f436c0"
-        url= "https://api.spoonacular.com/food/ingredients/substitutes"
-        params = { 'apiKey': apiKey, 'ingredientName': matched_name}
-        response = requests.get(url, params=params)
-
-        if response.status_code == 200:
-            ingredient_sub_formatted = response.json()
-            if ingredient_sub_formatted['message']== 'Could not find any substitutes for that ingredient.':
-                print("This ingredient does not have any substitutes.")
-            else:
-                substitues= ingredient_sub_formatted['substitutes']
-                print(f"The substitues for '{matched_name}' are: ")
-                for sub in substitues:
-                    print(sub)
-        elif response.status_code ==402:
-            print ("You have reached api call quota for the day")
-        else:
-            print("response code is: ", response.status_code)
-
-
     def cacheData(self, fileName):
         """
         Creates a new cache file or updates current cache file with more recipes.
@@ -261,6 +146,143 @@ class Recipes:
                 break
         with open(fileName, 'w') as f:
             json.dump(existing_data, f, indent=4)
+
+
+    def strip_parentheses(self, text):
+        """
+        takes out parethisis from text
+
+        Parameters
+        ----------
+        text : str
+            The text to remove parenthesis from.
+        Returns
+        ----------
+        text without parentheiss: str
+        """
+        return re.sub(r'\s*\(.*?\)', '', text).strip()
+    
+    def clean_ingredient_name(self, ingredient):
+        """
+        Cleans the ingredient name by removing measurements, numbers, units,
+        and parenthetical text (e.g., "butter (melted)" → "butter").
+
+        Parameters
+        ----------
+        ingredient : str
+            The name of the ingredient name to clean.
+        
+        Returns
+        ----------
+        cleaned ingredient name : str
+        """
+        ingredient = re.sub(r'\s*\(.*?\)', '', ingredient)
+        ingredient = re.sub(r'\b\d+\s*(oz|ozs|g|kg|lbs|cm|inch|cup|cups|tablespoon|teaspoon|pound|grams|ml|milliliter|liter|liters|serving|servings|tsp|tbsp)\b', '', ingredient)
+        ingredient = re.sub(r'\b(to|and|from|by|or|with)\b', '', ingredient, flags=re.IGNORECASE)
+        cleaned_name = re.sub(r'\s+', ' ', ingredient).strip().lower()
+        
+        return cleaned_name
+
+
+    def build_ingredient_list(self):
+        """
+        Builds a dictionary of unique ingredient names (full original names),
+        avoiding duplicates based on cleaned names AND IDs.
+        """
+        seen_cleaned = set()
+        cleaned_ingredients = {}
+
+        for recipe in self.recipes:
+            for ingredient in recipe['extendedIngredients']:
+                ingredient_id = ingredient['id']
+                original_name = ingredient['originalName']
+                cleaned_name_key = self.clean_ingredient_name(original_name)  # for deduplication
+                display_name = self.strip_parentheses(original_name)  # for user display
+
+                unique_key = (cleaned_name_key, display_name.lower())
+                if unique_key not in seen_cleaned:
+                    seen_cleaned.add(unique_key)
+                    cleaned_ingredients[ingredient_id] = display_name
+
+        self.ingredient_list = dict(sorted(cleaned_ingredients.items(), key=lambda item: item[1].lower()))
+        print(f"Built ingredient list with {len(self.ingredient_list)} unique items.")
+
+    def match_ingredient(self, ingredient_name):
+        ingredient_name = ingredient_name.lower().strip()
+
+        matches = [
+            (id, name) for id, name in self.ingredient_list.items()
+            if self.clean_ingredient_name(name).startswith(ingredient_name)
+            or self.clean_ingredient_name(name) == ingredient_name
+        ]
+
+        return matches
+
+    def get_substitutes(self, ingredient_name):
+
+        """
+        Fetches substitues of ingredient from the Spoonacular API. 
+        Prints out the substutes for the ingredients. 
+        If there are no substitues it prints could not find any substitutes. 
+
+        Parameters
+        ----------
+        self
+        str: ingredient name
+
+        Note
+        ----
+        The method fetches data from ""https://api.spoonacular.com/food/ingredients/substitutes
+
+        Returns
+        ----------
+        nothing
+        """
+
+        ingredient_name = self.clean_ingredient_name(ingredient_name)
+
+        matches = self.match_ingredient(ingredient_name)
+
+        if not matches:
+            print(f"No ingredient found matching '{ingredient_name}'.")
+            return []
+
+        if len(matches) > 1:
+            print(f"Multiple matches found for '{ingredient_name}':")
+            for i, (id, name) in enumerate(matches):
+                print(f"{i+1}. {name} (ID: {id})")
+        else:
+            ingredient_id, matched_name = matches[0]
+
+        while True:
+            try:
+                choice = int(input("Enter the number of the ingredient you meant: "))
+                if 1 <= choice <= len(matches):
+                    ingredient_id, matched_name = matches[choice - 1]
+                    break
+                else:
+                    print("Invalid choice. Please enter a number from the list.")
+            except ValueError:
+                print("Please enter a valid number.")
+    
+        apiKey= "84054af1abdd4b06a0146895a8f436c0"
+        url= "https://api.spoonacular.com/food/ingredients/substitutes"
+        params = { 'apiKey': apiKey, 'ingredientName': matched_name}
+        response = requests.get(url, params=params)
+
+        if response.status_code == 200:
+            ingredient_sub_formatted = response.json()
+            if ingredient_sub_formatted['message']== 'Could not find any substitutes for that ingredient.':
+                print("This ingredient does not have any substitutes.")
+            else:
+                substitues= ingredient_sub_formatted['substitutes']
+                print(f"The substitues for '{matched_name}' are: ")
+                for sub in substitues:
+                    print(sub)
+        elif response.status_code ==402:
+            print ("You have reached api call quota for the day")
+        else:
+            print("response code is: ", response.status_code)
 
 
     def build_ingredient_network(self):
@@ -317,8 +339,9 @@ class Recipes:
             A list of recommended ingredient names with co-occurrence frequency.
         """
 
-        matches = [(id, name) for id, name in self.ingredient_list.items() if ingredient_name.lower() in name.lower()]
+        ingredient_name = self.clean_ingredient_name(ingredient_name)
 
+        matches = self.match_ingredient(ingredient_name)
         if not matches:
             print(f"No ingredient found matching '{ingredient_name}'.")
             return []
@@ -379,7 +402,9 @@ class Recipes:
             nothing
         """
 
-        matches = [(id, name) for id, name in self.ingredient_list.items() if ingredient_name.lower() in name.lower()]
+        ingredient_name = self.clean_ingredient_name(ingredient_name)
+
+        matches = self.match_ingredient(ingredient_name)
 
         if not matches:
             print(f"No ingredient found matching '{ingredient_name}'.")
