@@ -19,12 +19,12 @@ class Recipes:
         """
         Initializes the Recipe class without any recipes.
         assign recipes attribute to an empty list
-        
+
         Parameters
         ----------
          cacheFile: str, optional
             name of cache file to load data from, if None initialized without data
-    
+
          Return
          ----------
             nothing
@@ -100,48 +100,54 @@ class Recipes:
             print(f"Error loading cache: {e}")
             return False
 
+    def strip_parentheses(self, text):
+        return re.sub(r'\s*\(.*?\)', '', text).strip()
 
     def build_ingredient_list(self):
         """
-        Creates a dictionary mapping unique ingredient names to their IDs,
-        avoiding duplicate ingredient names (case-insensitive).
+        Builds a dictionary of unique ingredient names (full original names),
+        avoiding duplicates based on cleaned names AND IDs.
         """
-        seen_names = set()
+        seen_cleaned = set()
         cleaned_ingredients = {}
 
         for recipe in self.recipes:
             for ingredient in recipe['extendedIngredients']:
                 ingredient_id = ingredient['id']
-                ingredient_name = ingredient['name'].strip().lower()
-                cleaned_name = self.clean_ingredient_name(ingredient_name)
+                original_name = ingredient['originalName']
+                cleaned_name_key = self.clean_ingredient_name(original_name)  # for deduplication
+                display_name = self.strip_parentheses(original_name)  # for user display
 
-
-                if cleaned_name not in seen_names:
-                    seen_names.add(cleaned_name)
-                    cleaned_ingredients[ingredient_id] = ingredient['name']
+                unique_key = (cleaned_name_key, display_name.lower())
+                if unique_key not in seen_cleaned:
+                    seen_cleaned.add(unique_key)
+                    cleaned_ingredients[ingredient_id] = display_name
 
         self.ingredient_list = dict(sorted(cleaned_ingredients.items(), key=lambda item: item[1].lower()))
         print(f"Built ingredient list with {len(self.ingredient_list)} unique items.")
 
-
     def clean_ingredient_name(self, ingredient):
         """
-        Cleans the ingredient name by removing measurements, numbers, and extra terms
-        like "tsp", "tbsp", "oz", etc.
-
-        Parameters
-        ----------
-        self
-        str: ingredient name
-
-        Returns
-        ----------
-        str: cleaned ingredient name
+        Cleans the ingredient name by removing measurements, numbers, units,
+        and parenthetical text (e.g., "butter (melted)" → "butter").
         """
-        cleaned_name = re.sub(r'\d+|tsp|tbsp|oz|g|kg|lbs|cm|inch|cup|tablespoon|teaspoon|pound|grams|milliliter|liter|serving|to|and|from|by|\\+|\\-|\(|\)', '', ingredient)
-        cleaned_name = cleaned_name.strip()
+        ingredient = re.sub(r'\s*\(.*?\)', '', ingredient)
+        ingredient = re.sub(r'\b\d+\s*(oz|ozs|g|kg|lbs|cm|inch|cup|cups|tablespoon|teaspoon|pound|grams|ml|milliliter|liter|liters|serving|servings|tsp|tbsp)\b', '', ingredient)
+        ingredient = re.sub(r'\b(to|and|from|by|or|with)\b', '', ingredient, flags=re.IGNORECASE)
+        cleaned_name = re.sub(r'\s+', ' ', ingredient).strip().lower()
+        
         return cleaned_name
 
+    def match_ingredient(self, ingredient_name):
+        ingredient_name = ingredient_name.lower().strip()
+
+        matches = [
+            (id, name) for id, name in self.ingredient_list.items()
+            if self.clean_ingredient_name(name).startswith(ingredient_name)
+            or self.clean_ingredient_name(name) == ingredient_name
+        ]
+
+        return matches
 
     def get_substitutes(self, ingredient_name):
 
@@ -358,7 +364,7 @@ class Recipes:
         Given an ingredient name, fetches data from Spoonacular about the ingredinet. 
         Uses ingredinet dictionary to find ingredinets with the entered string in it and prints the options in an ordered list. 
         Prints the price and grocery ailse the ingredient is found in. 
-        
+
         Note:
         -----------
         Uses endpoint: https://api.spoonacular.com/food/ingredients/{ingredient_id}/information
